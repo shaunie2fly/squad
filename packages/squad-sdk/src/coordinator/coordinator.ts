@@ -26,6 +26,8 @@ import {
 } from '../config/routing.js';
 import type { RoutingConfig as RuntimeRoutingConfig } from '../runtime/config.js';
 import { spawnParallel, type AgentSpawnConfig, type SpawnResult, type FanOutDependencies } from './fan-out.js';
+import type { GeminiA2AClient } from '../remote/a2a-client.js';
+import { A2AError } from '../remote/a2a-client.js';
 import { trace, SpanStatusCode } from '../runtime/otel-api.js';
 
 const tracer = trace.getTracer('squad-sdk');
@@ -65,6 +67,8 @@ export interface SquadCoordinatorOptions {
   directHandler?: DirectResponseHandler;
   /** Custom compiled router (skips compilation from config) */
   compiledRouter?: CompiledRouter;
+  /** Optional Gemini A2A client for external agent dispatch */
+  geminiA2AClient?: GeminiA2AClient;
 }
 
 // --- Coordinator Class ---
@@ -85,12 +89,14 @@ export class SquadCoordinator {
   private directHandler: DirectResponseHandler;
   private compiledRouter: CompiledRouter;
   private fanOutDeps?: FanOutDependencies;
+  private geminiA2AClient?: GeminiA2AClient;
 
   constructor(options: SquadCoordinatorOptions) {
     this.config = options.config;
     this.eventBus = options.eventBus;
     this.fanOutDeps = options.fanOutDeps;
     this.directHandler = options.directHandler ?? new DirectResponseHandler();
+    this.geminiA2AClient = options.geminiA2AClient;
 
     // Compile routing rules from config or use provided router
     if (options.compiledRouter) {
@@ -148,6 +154,68 @@ export class SquadCoordinator {
 
       span.setAttribute('target.agents', routing.agents.join(','));
       span.setAttribute('routing.confidence', routing.confidence);
+
+      // --- Step 2.5: A2A dispatch check ---
+      const geminiCfg = this.config.mesh?.geminiA2A;
+      if (
+        geminiCfg?.enabled &&
+        this.geminiA2AClient &&
+        routing.agents.some(a => a.replace(/^@/, '') === geminiCfg.agentName)
+      ) {
+        const dispatchStart = Date.now();
+        await this.emit('agent:a2a_dispatch', context.sessionId, {
+          agentName: geminiCfg.agentName,
+          endpoint: geminiCfg.endpoint,
+          promptLength: message.length,
+          ...(geminiCfg.model !== undefined ? { model: geminiCfg.model } : {}),
+        });
+
+        try {
+          const a2aResult = await this.geminiA2AClient.sendTask(message);
+          const durationMs = Date.now() - dispatchStart;
+
+          if (a2aResult.status === 'in_progress') {
+            // Remote task has not completed yet; fall through to normal spawn strategy.
+            throw new Error('A2A task is still in progress; falling back to normal spawn.');
+          }
+
+          await this.emit('agent:a2a_response', context.sessionId, {
+            agentName: geminiCfg.agentName,
+            status: a2aResult.status,
+            durationMs,
+            artifactCount: a2aResult.artifacts?.length ?? 0,
+          });
+
+          const spawnResult: SpawnResult = {
+            agentName: geminiCfg.agentName,
+            status: a2aResult.status === 'failed' ? 'failed' : 'success',
+            startTime: new Date(Date.now() - durationMs),
+            endTime: new Date(),
+            ...(a2aResult.status === 'failed'
+              ? { error: 'Remote A2A agent reported task failure.' }
+              : {}),
+          };
+
+          span.setAttribute('routing.strategy', 'single');
+          return {
+            strategy: 'single',
+            routing,
+            spawnResults: [spawnResult],
+            durationMs: Date.now() - start,
+          };
+        } catch (a2aErr) {
+          const durationMs = Date.now() - dispatchStart;
+          const errMsg = a2aErr instanceof A2AError ? a2aErr.message : String(a2aErr);
+
+          await this.emit('session:error', context.sessionId, {
+            phase: 'a2a_dispatch',
+            agentName: geminiCfg.agentName,
+            error: errMsg,
+            durationMs,
+          });
+          // Fall through to normal spawn strategy
+        }
+      }
 
       // --- Step 3: Determine spawn strategy ---
       const strategy = this.determineStrategy(routing);

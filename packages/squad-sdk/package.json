@@ -185,6 +185,10 @@
     "./config/models": {
       "types": "./dist/config/models.d.ts",
       "import": "./dist/config/models.js"
+    },
+    "./remote/a2a": {
+      "types": "./dist/remote/a2a-client.d.ts",
+      "import": "./dist/remote/a2a-client.js"
     }
   },
   "files": [

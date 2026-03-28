@@ -309,4 +309,7 @@ export interface SquadSDKConfig {
 
   /** Skill definitions. */
   readonly skills?: readonly SkillDefinition[];
+
+  /** External agent mesh connections (e.g. Gemini CLI via A2A). */
+  readonly mesh?: import('../config/schema.js').MeshConfig;
 }

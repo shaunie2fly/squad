@@ -303,6 +303,22 @@ export interface SquadConfig {
   
   /** Platform-specific overrides */
   platforms?: PlatformOverrides;
+
+  /**
+   * External agent mesh connections (e.g. Gemini CLI via A2A).
+   * See `GeminiA2AConfig` in config/schema.ts for full documentation.
+   */
+  mesh?: {
+    geminiA2A?: {
+      enabled: boolean;
+      endpoint: string;
+      agentName: string;
+      model?: string;
+      authToken?: string;
+      /** Request timeout in milliseconds (default: 30 000). */
+      timeoutMs?: number;
+    };
+  };
   
   /** Custom extensions */
   [key: string]: unknown;
