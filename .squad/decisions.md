@@ -8087,3 +8087,68 @@ Triaged 14 untriaged issues (3 docs, 6 community features, 3 bugs, 2 questions).
 - #357, #336, #335, #334, #333, #332, #316 (A2A) — stays shelved per existing decision
 - #581 (ADO PRD) — P2, blocked until #341 (SDK-first parity) ships
 
+
+---
+
+## 2026-03-28: Gemini CLI A2A Integration Plan
+
+**Author:** Copilot (branch: squad/add-gemini-cli-integration)  
+**Status:** Approved — ready for implementation  
+**References:** Distributed Mesh decision (above)
+
+### Overview
+
+Integrate Google's `gemini-cli` into Squad's multi-agent mesh using the Agent2Agent (A2A) JSON-RPC 2.0 protocol. Treats `gemini-cli` as an autonomous peer (HTTP JSON-RPC) rather than a blocking subprocess. Results flow through the existing Event Bus with a uniform `CoordinatorResult` shape.
+
+### Implementation Phases
+
+#### Phase 1 — Configuration Schema (`packages/squad-sdk/src/config/schema.ts`)
+
+Add `GeminiA2AConfig` and `MeshConfig` interfaces; add optional `mesh?: MeshConfig` to `SquadConfig`. Feature is **strictly opt-in** — `mesh` absent from `DEFAULT_CONFIG`. Update `validateConfig()` and `defineConfig()`. Re-export new types from `config/index.ts`.
+
+#### Phase 2 — A2A JSON-RPC Client (`packages/squad-sdk/src/remote/a2a-client.ts`, new file)
+
+`GeminiA2AClient` class with `sendTask(prompt): Promise<A2ATaskResult>`. Uses `globalThis.fetch` and `crypto.randomUUID()` — **no new npm dependencies**. Typed `A2AError` class (never logs `authToken`). `model` key conditionally absent from wire payload when unset. Re-export from `remote/index.ts`; add `./remote/a2a` export path to `package.json`.
+
+#### Phase 3 — Coordinator Integration (`packages/squad-sdk/src/coordinator/coordinator.ts`)
+
+Inject `GeminiA2AClient` via `SquadCoordinatorOptions.geminiA2AClient` (not constructed internally — keeps coordinator testable). Insert Step 2.5 between Route analysis and Spawn strategy: check `mesh.geminiA2A.enabled`, agent name match, and client presence before dispatching via HTTP. Maps `A2ATaskResult` to `SpawnResult` shape — uniform result for all downstream consumers.
+
+#### Phase 4 — Event Bus Integration (`packages/squad-sdk/src/runtime/event-bus.ts`)
+
+Add `'agent:a2a_dispatch'` and `'agent:a2a_response'` to `SquadOperationalEvent` union. Payloads never include `authToken`.
+
+#### Phase 5 — Builder Support (`packages/squad-sdk/src/builders/index.ts`)
+
+Add `defineMesh(config: MeshConfig): MeshConfig` builder. Update `defineSquad` to accept and pass through `mesh`.
+
+#### Phase 6 — Tests (Vitest)
+
+Three new test files: `test/remote/a2a-client.test.ts` (10 cases), `test/coordinator/gemini-routing.test.ts` (8 cases), `test/config/mesh-schema.test.ts` (4 cases).
+
+#### Phase 7 — Documentation
+
+New guide in `docs/`; JSDoc on all exported types; security guidance (`authToken` via env var, never committed).
+
+### Key Design Decisions
+
+| # | Decision | Rationale |
+|---|---|---|
+| 1 | Plain TypeScript interfaces (no Zod) | Matches existing `schema.ts` style |
+| 2 | Strictly opt-in | Zero behavior change for existing users |
+| 3 | Constructor injection of client | Coordinator remains testable |
+| 4 | Conditional `model` key | Absent on wire when unset |
+| 5 | No new npm dependencies | `globalThis.fetch` + `crypto.randomUUID()` (Node ≥22.5.0) |
+| 6 | `authToken` never logged | Excluded from all event payloads and error messages |
+| 7 | Uniform `CoordinatorResult` shape | Downstream consumers work unmodified |
+| 8 | `mesh` as top-level config field | Network topology is distinct from model/routing config |
+| 9 | No retry in v1 | Coordinator fallback handles failures |
+| 10 | Plain HTTP fetch (not vscode-jsonrpc) | Simpler for request/response vs. LSP streams |
+
+### Dependency Impact
+
+- **New npm packages:** None  
+- **New source files:** 1 (`src/remote/a2a-client.ts`)  
+- **Modified source files:** ~8  
+- **New test files:** 3  
+- **Breaking changes:** None
