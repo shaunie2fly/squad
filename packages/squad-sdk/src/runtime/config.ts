@@ -315,6 +315,8 @@ export interface SquadConfig {
       agentName: string;
       model?: string;
       authToken?: string;
+      /** Request timeout in milliseconds (default: 30 000). */
+      timeoutMs?: number;
     };
   };
   

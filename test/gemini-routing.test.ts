@@ -172,6 +172,40 @@ describe('SquadCoordinator A2A dispatch', () => {
 
   // -------------------------------------------------------------------------
 
+  it('falls through to normal spawn when A2A returns in_progress', async () => {
+    const client = makeA2AClient({ status: 'in_progress' });
+    const { coordinator, bus } = makeCoordinator({ geminiA2AClient: client });
+    const errorEvents: unknown[] = [];
+    bus.subscribe('session:error', (e) => errorEvents.push(e.payload));
+
+    // Should not throw — in_progress triggers fallthrough
+    const result = await coordinator.handleMessage('@gemini research this', SESSION_CTX);
+
+    // A2A client was called
+    expect(client.sendTask).toHaveBeenCalledOnce();
+    // Falls through to normal strategy (no fan-out deps → fallback)
+    expect(['single', 'multi', 'fallback']).toContain(result.strategy);
+    // session:error is emitted for the in_progress fallthrough
+    expect(errorEvents.length).toBeGreaterThan(0);
+  });
+
+  // -------------------------------------------------------------------------
+
+  it('SpawnResult has error field when A2A server returns failed status', async () => {
+    const client = makeA2AClient({ status: 'failed' });
+    const { coordinator } = makeCoordinator({ geminiA2AClient: client });
+
+    const result = await coordinator.handleMessage('@gemini research this', SESSION_CTX);
+
+    expect(result.spawnResults).toHaveLength(1);
+    expect(result.spawnResults![0]!.status).toBe('failed');
+    expect(typeof result.spawnResults![0]!.error).toBe('string');
+    expect(result.spawnResults![0]!.error).not.toContain('authToken');
+    expect(result.spawnResults![0]!.error).not.toContain('Bearer');
+  });
+
+  // -------------------------------------------------------------------------
+
   it('falls back to normal strategy when A2A is disabled (enabled: false)', async () => {
     const client = makeA2AClient({ status: 'completed' });
     const disabledConfig = makeConfig(false);

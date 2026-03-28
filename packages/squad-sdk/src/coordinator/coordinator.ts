@@ -174,6 +174,11 @@ export class SquadCoordinator {
           const a2aResult = await this.geminiA2AClient.sendTask(message);
           const durationMs = Date.now() - dispatchStart;
 
+          if (a2aResult.status === 'in_progress') {
+            // Remote task has not completed yet; fall through to normal spawn strategy.
+            throw new Error('A2A task is still in progress; falling back to normal spawn.');
+          }
+
           await this.emit('agent:a2a_response', context.sessionId, {
             agentName: geminiCfg.agentName,
             status: a2aResult.status,
@@ -186,6 +191,9 @@ export class SquadCoordinator {
             status: a2aResult.status === 'failed' ? 'failed' : 'success',
             startTime: new Date(Date.now() - durationMs),
             endTime: new Date(),
+            ...(a2aResult.status === 'failed'
+              ? { error: 'Remote A2A agent reported task failure.' }
+              : {}),
           };
 
           span.setAttribute('routing.strategy', 'single');

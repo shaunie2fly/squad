@@ -134,7 +134,7 @@ export class GeminiA2AClient {
    * @throws {A2AError} On HTTP errors, JSON-RPC errors, or network failures.
    */
   async sendTask(prompt: string): Promise<A2ATaskResult> {
-    const { endpoint, model, authToken } = this.config;
+    const { endpoint, model, authToken, timeoutMs = 30_000 } = this.config;
 
     // Build JSON-RPC params — model key is absent when not configured
     const params: A2ATaskParams = {
@@ -165,12 +165,20 @@ export class GeminiA2AClient {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (networkError) {
-      // Network-level failure — never expose authToken in message
+      // Network-level failure or timeout — never expose authToken in message.
+      // `AbortSignal.timeout()` throws `TimeoutError` in Node ≥18 / modern browsers.
+      // Older runtimes may surface `AbortError` instead. Both are handled here.
+      const isTimeout =
+        networkError instanceof Error &&
+        (networkError.name === 'TimeoutError' || networkError.name === 'AbortError');
       throw new A2AError(
-        `A2A network error connecting to ${endpoint}: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
-        undefined,
+        isTimeout
+          ? `A2A request to ${endpoint} timed out after ${timeoutMs}ms`
+          : `A2A network error connecting to ${endpoint}: ${networkError instanceof Error ? networkError.message : String(networkError)}`,
+        isTimeout ? 408 : undefined,
         endpoint,
       );
     }

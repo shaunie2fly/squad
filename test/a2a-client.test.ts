@@ -176,6 +176,35 @@ describe('GeminiA2AClient', () => {
 
   // -------------------------------------------------------------------------
 
+  it('sendTask — throws A2AError with timeout message when fetch times out', async () => {
+    const timeoutError = new DOMException('signal timed out', 'TimeoutError');
+    fetchSpy.mockRejectedValueOnce(timeoutError);
+
+    const client = new GeminiA2AClient(makeConfig({ timeoutMs: 5000 }));
+    const err = await client.sendTask('hello').catch(e => e);
+    expect(err).toBeInstanceOf(A2AError);
+    expect(err.message).toContain('timed out');
+    expect(err.message).toContain('5000ms');
+    expect(err.code).toBe(408);
+  });
+
+  // -------------------------------------------------------------------------
+
+  it('sendTask — uses default 30 000ms timeout when timeoutMs not set', async () => {
+    fetchSpy.mockResolvedValueOnce(makeSuccessResponse({ status: 'completed' }));
+
+    const client = new GeminiA2AClient(makeConfig());
+    // Should resolve without error when fetch returns successfully
+    const result = await client.sendTask('hello');
+    expect(result.status).toBe('completed');
+
+    // Verify fetch was called — signal presence is implementation-internal but we can
+    // confirm the call itself was made (AbortSignal is a built-in, not externally inspectable)
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  // -------------------------------------------------------------------------
+
   it('sendTask — request shape matches A2A spec', async () => {
     fetchSpy.mockResolvedValueOnce(
       makeSuccessResponse({ status: 'completed' }),

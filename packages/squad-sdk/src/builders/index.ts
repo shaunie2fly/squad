@@ -506,6 +506,7 @@ export function defineMesh(config: MeshConfig): MeshConfig {
     assertNonEmptyString(g.agentName, 'geminiA2A.agentName', 'defineMesh');
     assertOptionalString(g.model, 'geminiA2A.model', 'defineMesh');
     assertOptionalString(g.authToken, 'geminiA2A.authToken', 'defineMesh');
+    assertOptionalNumber(g.timeoutMs, 'geminiA2A.timeoutMs', 'defineMesh');
   }
   return config;
 }

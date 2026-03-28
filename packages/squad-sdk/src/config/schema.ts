@@ -28,6 +28,13 @@ export interface GeminiA2AConfig {
    * MUST NOT be committed to source — supply via environment variable.
    */
   authToken?: string;
+  /**
+   * Request timeout in milliseconds (default: `30_000`).
+   * If the server accepts the connection but never responds the request is
+   * aborted after this interval and the coordinator falls through to its
+   * normal spawn strategy.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -180,6 +187,7 @@ export function validateConfig(config: unknown): config is SquadConfig {
       if (typeof geminiA2A.agentName !== 'string') return false;
       if (geminiA2A.model !== undefined && typeof geminiA2A.model !== 'string') return false;
       if (geminiA2A.authToken !== undefined && typeof geminiA2A.authToken !== 'string') return false;
+      if (geminiA2A.timeoutMs !== undefined && typeof geminiA2A.timeoutMs !== 'number') return false;
     }
   }
   

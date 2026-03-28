@@ -8084,7 +8084,7 @@ Triaged 14 untriaged issues (3 docs, 6 community features, 3 bugs, 2 questions).
 
 ## Deferred
 
-- #357, #336, #335, #334, #333, #332, #316 (A2A) — stays shelved per existing decision
+- #357, #336, #335, #334, #333, #332, #316 (A2A framework issues) — the original framework issues remain shelved per the 2026-03-16 decision; however, **Gemini CLI A2A integration via JSON-RPC is explicitly unshelved and approved** — see the 2026-03-28 entry below, which supersedes the shelving for this specific integration path
 - #581 (ADO PRD) — P2, blocked until #341 (SDK-first parity) ships
 
 
@@ -8094,6 +8094,7 @@ Triaged 14 untriaged issues (3 docs, 6 community features, 3 bugs, 2 questions).
 
 **Author:** Copilot (branch: squad/add-gemini-cli-integration)  
 **Status:** Approved — ready for implementation  
+**Supersedes:** The "A2A stays shelved" bullet in the entry above for this specific JSON-RPC integration path. The original framework issues (#332–#336, #316, #357) remain shelved; only the Gemini CLI A2A JSON-RPC integration is unshelved by this decision.  
 **References:** Distributed Mesh decision (above)
 
 ### Overview
