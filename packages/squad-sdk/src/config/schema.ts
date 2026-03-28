@@ -3,6 +3,42 @@
  * Typed configuration interface for Squad teams
  */
 
+/**
+ * Configuration for a Gemini CLI A2A (Agent2Agent) server connection.
+ * Uses the A2A JSON-RPC 2.0 protocol over HTTP.
+ *
+ * Security: `authToken` must never be committed to source control.
+ * Use an environment variable instead:
+ *   authToken: process.env.SQUAD_GEMINI_AUTH_TOKEN
+ */
+export interface GeminiA2AConfig {
+  /** Master toggle — must be explicitly set to `true` to enable A2A routing. */
+  enabled: boolean;
+  /** HTTP endpoint where gemini-cli is serving (default: `'http://127.0.0.1:8080'`). */
+  endpoint: string;
+  /** Agent name the coordinator matches against (default: `'gemini'`). */
+  agentName: string;
+  /**
+   * Optional model hint sent in the JSON-RPC payload (e.g. `'gemini-2.5-pro'`).
+   * When omitted the remote server uses its configured default.
+   */
+  model?: string;
+  /**
+   * Optional bearer token for the A2A server.
+   * MUST NOT be committed to source — supply via environment variable.
+   */
+  authToken?: string;
+}
+
+/**
+ * Mesh configuration — external agent connections and cross-machine coordination.
+ * Corresponds to the "Distributed Mesh" architecture decision.
+ */
+export interface MeshConfig {
+  /** Gemini CLI A2A server connection. */
+  geminiA2A?: GeminiA2AConfig;
+}
+
 export interface SquadConfig {
   version: string;
   team: TeamConfig;
@@ -12,6 +48,8 @@ export interface SquadConfig {
   hooks?: HooksConfig;
   ceremonies?: CeremonyConfig[];
   plugins?: PluginConfig;
+  /** External agent mesh connections (e.g. Gemini CLI via A2A). */
+  mesh?: MeshConfig;
 }
 
 export interface TeamConfig {
@@ -130,6 +168,20 @@ export function validateConfig(config: unknown): config is SquadConfig {
   if (!c.routing || !Array.isArray(c.routing.rules)) return false;
   if (!c.models || typeof c.models.default !== 'string') return false;
   if (!Array.isArray(c.agents)) return false;
+
+  // Validate optional mesh config
+  if (c.mesh !== undefined) {
+    if (typeof c.mesh !== 'object' || c.mesh === null) return false;
+    const { geminiA2A } = c.mesh;
+    if (geminiA2A !== undefined) {
+      if (typeof geminiA2A !== 'object' || geminiA2A === null) return false;
+      if (typeof geminiA2A.enabled !== 'boolean') return false;
+      if (typeof geminiA2A.endpoint !== 'string') return false;
+      if (typeof geminiA2A.agentName !== 'string') return false;
+      if (geminiA2A.model !== undefined && typeof geminiA2A.model !== 'string') return false;
+      if (geminiA2A.authToken !== undefined && typeof geminiA2A.authToken !== 'string') return false;
+    }
+  }
   
   return true;
 }

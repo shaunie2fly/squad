@@ -23,6 +23,7 @@ import type {
   SkillDefinition,
   SquadSDKConfig,
 } from './types.js';
+import type { MeshConfig } from '../config/schema.js';
 
 // Re-export every type so consumers can `import { defineTeam, TeamDefinition } from './builders'`
 export type {
@@ -45,6 +46,7 @@ export type {
   SkillTool,
   SquadSDKConfig,
 } from './types.js';
+export type { MeshConfig, GeminiA2AConfig } from '../config/schema.js';
 
 // ---------------------------------------------------------------------------
 // Validation helpers (private)
@@ -474,6 +476,41 @@ export function defineDefaults(config: DefaultsDefinition): DefaultsDefinition {
 }
 
 // ---------------------------------------------------------------------------
+// defineMesh — external agent mesh configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Define the external agent mesh configuration (e.g. Gemini CLI via A2A).
+ *
+ * ```ts
+ * const mesh = defineMesh({
+ *   geminiA2A: {
+ *     enabled: true,
+ *     endpoint: 'http://127.0.0.1:8080',
+ *     agentName: 'gemini',
+ *     model: 'gemini-2.5-pro',
+ *     // authToken: process.env.SQUAD_GEMINI_AUTH_TOKEN — never commit tokens!
+ *   },
+ * });
+ * ```
+ */
+export function defineMesh(config: MeshConfig): MeshConfig {
+  assertObject(config, 'defineMesh');
+  if (config.geminiA2A !== undefined) {
+    const g = config.geminiA2A;
+    assertObject(g, 'defineMesh');
+    if (typeof g.enabled !== 'boolean') {
+      throw new BuilderValidationError('defineMesh', '"geminiA2A.enabled" must be a boolean');
+    }
+    assertNonEmptyString(g.endpoint, 'geminiA2A.endpoint', 'defineMesh');
+    assertNonEmptyString(g.agentName, 'geminiA2A.agentName', 'defineMesh');
+    assertOptionalString(g.model, 'geminiA2A.model', 'defineMesh');
+    assertOptionalString(g.authToken, 'geminiA2A.authToken', 'defineMesh');
+  }
+  return config;
+}
+
+// ---------------------------------------------------------------------------
 // defineSquad — top-level composition
 // ---------------------------------------------------------------------------
 
@@ -518,6 +555,7 @@ export function defineSquad(config: SquadSDKConfig): SquadSDKConfig {
       defineSkill(skill);
     }
   }
+  if (config.mesh !== undefined) defineMesh(config.mesh);
 
   return config;
 }

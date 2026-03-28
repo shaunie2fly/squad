@@ -33,3 +33,15 @@ export type {
   RemoteConnection,
   ConnectionState,
 } from './types.js';
+
+// A2A (Agent2Agent) client
+export {
+  GeminiA2AClient,
+  createGeminiA2AClient,
+  A2AError,
+  type A2ARequest,
+  type A2AResponse,
+  type A2ATaskParams,
+  type A2ATaskResult,
+} from './a2a-client.js';
+

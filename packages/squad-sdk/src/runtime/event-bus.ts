@@ -29,6 +29,8 @@ export type SquadOperationalEvent =
   | 'session:message'
   | 'session:tool_call'
   | 'agent:milestone'
+  | 'agent:a2a_dispatch'
+  | 'agent:a2a_response'
   | 'coordinator:routing'
   | 'pool:health';
 

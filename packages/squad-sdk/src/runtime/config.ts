@@ -303,6 +303,20 @@ export interface SquadConfig {
   
   /** Platform-specific overrides */
   platforms?: PlatformOverrides;
+
+  /**
+   * External agent mesh connections (e.g. Gemini CLI via A2A).
+   * See `GeminiA2AConfig` in config/schema.ts for full documentation.
+   */
+  mesh?: {
+    geminiA2A?: {
+      enabled: boolean;
+      endpoint: string;
+      agentName: string;
+      model?: string;
+      authToken?: string;
+    };
+  };
   
   /** Custom extensions */
   [key: string]: unknown;
